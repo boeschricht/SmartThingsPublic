@@ -22,6 +22,8 @@
  *
  *	Changelog:
  *
+ *  1.03 (11/14/2017) - Turn off firmware event log, correct physical button setting for some presses, remove 100ms delay in instant status
+ *  1.02 (06/25/2017) - Pulled in @stephack's changes to include button 7/8 events when triggered remotely
  *  1.01 (01/16/2017) - Corrected advertised number of buttons (8)
  *  1.00 (01/14/2017) - Added button 7 (single tap up) and button 8 (single tap down). Added firmware version display.
  *  0.12 (06/03/2016) - Added press type indicator to display last tap/hold press status
@@ -198,6 +200,7 @@ def zwaveEvent(physicalgraph.zwave.Command cmd) {
 }
 
 def on() {
+	sendEvent(tapUp1Response("digital"))
 	delayBetween([
 		zwave.basicV1.basicSet(value: 0xFF).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
@@ -205,6 +208,7 @@ def on() {
 }
 
 def off() {
+	sendEvent(tapDown1Response("digital"))
 	delayBetween([
 		zwave.basicV1.basicSet(value: 0x00).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
@@ -232,7 +236,7 @@ def setFirmwareVersion() {
    {
      versionInfo=versionInfo+"Firmware unknown"
    }   
-   sendEvent(name: "firmwareVersion",  value: versionInfo, isStateChange: true)
+   sendEvent(name: "firmwareVersion",  value: versionInfo, isStateChange: true, displayed: false)
 }
 
 def refresh() {
@@ -273,10 +277,8 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
           switch (cmd.keyAttributes) {
               case 0:
                   // Press Once
-                  result=createEvent([name: "switch", value: "on", type: "physical"])
-                  sendEvent(name: "status" , value: "Tap ▲")
-	              sendEvent(name: "button" , value: "pushed", data: [buttonNumber: "7"], descriptionText: "$device.displayName Tap-Up-1 (button 7) pressed", 
-                       isStateChange: true, type: "$buttonType")
+                  result += createEvent(tapUp1Response("physical"))  
+                  result += createEvent([name: "switch", value: "on", type: "physical"])
                   break
  
               case 1:
@@ -285,7 +287,6 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
               case 2:
                   // Hold
                   result += createEvent(holdUpResponse("physical"))  
-                  result += response("delay 100")
                   result += createEvent([name: "switch", value: "on", type: "physical"])    
 
                   break
@@ -307,10 +308,8 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
           switch (cmd.keyAttributes) {
               case 0:
                   // Press Once
-                  result=createEvent([name: "switch", value: "off", type: "physical"])
-                  sendEvent(name: "status" , value: "Tap ▼")
-	              sendEvent(name: "button" , value: "pushed", data: [buttonNumber: "8"], descriptionText: "$device.displayName Tap-Down-1 (button 8) pressed", 
-                       isStateChange: true, type: "$buttonType")
+                  result += createEvent(tapDown1Response("physical"))
+                  result += createEvent([name: "switch", value: "off", type: "physical"]) 
                   break
               case 1:
                   result=createEvent([name: "switch", value: "off", type: "physical"])
@@ -318,7 +317,6 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
               case 2:
                   // Hold
                   result += createEvent(holdDownResponse("physical"))
-                  result += response("delay 100")
                   result += createEvent([name: "switch", value: "off", type: "physical"]) 
                   break
               case 3: 
@@ -341,13 +339,25 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
    return result
 }
 
+def tapUp1Response(String buttonType) {
+    sendEvent(name: "status" , value: "Tap ▲")
+	[name: "button", value: "pushed", data: [buttonNumber: "7"], descriptionText: "$device.displayName Tap-Up-1 (button 7) pressed", 
+       isStateChange: true, type: "$buttonType"]
+}
+
+def tapDown1Response(String buttonType) {
+    sendEvent(name: "status" , value: "Tap ▼")
+	[name: "button", value: "pushed", data: [buttonNumber: "8"], descriptionText: "$device.displayName Tap-Down-1 (button 8) pressed", 
+      isStateChange: true, type: "$buttonType"]
+}
+
 def tapUp2Response(String buttonType) {
     sendEvent(name: "status" , value: "Tap ▲▲")
 	[name: "button", value: "pushed", data: [buttonNumber: "1"], descriptionText: "$device.displayName Tap-Up-2 (button 1) pressed", 
        isStateChange: true, type: "$buttonType"]
 }
 
-def tapDown2Response(String buttontype) {
+def tapDown2Response(String buttonType) {
     sendEvent(name: "status" , value: "Tap ▼▼")
 	[name: "button", value: "pushed", data: [buttonNumber: "2"], descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed", 
       isStateChange: true, type: "$buttonType"]
