@@ -1,7 +1,7 @@
 /**
  *  ZHC5010 Z-Wave switch module test
  *
- *  Copyright 2016 DarwinsDen.com
+ *  Copyright 2018 Bo Eschricht. Based on original work by DarwinsDen.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -12,326 +12,158 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *	Author: Darwin@DarwinsDen.com
- *	Date: 2016-06-08
+ *	Author: boeschricht@gmail.com
+ *	Date: 2019-01-06
  *
  *	Changelog:
+ *  0.2	(boeschricht@gmail.com)				      -   Fixes:
+ *																								- improved support for security command class
+ *  0.1 (02/07/2017, boeschricht@gmail.com) -  Major improvements of handler code for firmware 1.10.
+ *                                              Improved Simulator support
+ *                                              Fixes:
+ *                                              Added support for command classes:
+ *                                               - Central Scene - for better handling of button double-press, hold
+ *                                               - Multi-level - dimming
+ *                                               - Indicator - for control of LED's
+ *                                              Added preference options for:
+ *                                               - Enhanced control of relay mode
+ *				                        		           - Control of LED indicator modes, LED "on"/"off" brightness levels
+ *                                               - Disabling House Cleaning Mode (double press sends dimming command for 100% light level)
  *
- *	0.05 (10/29/2017) -	Corrected sendEvent typo
- *	0.04 (10/29/2017) -	Add Z-Wave dimmer capability
- *	0.03 (12/23/2016) -	Added test/workaround preference option to cancel single press after double press. Added
- *                      preference option to disable switch relay
- *	0.02 (08/04/2016) -	Added double and triple tap (increments button by +4, and +8 respectively)
- *	0.01 (06/08/2016) -	Initial 0.01 Test Code/Beta
  */
- 
+ */
+
+
 metadata {
-	definition (name: "ZHC5010 Switch", namespace: "darwinsden", author: "darwin@darwinsden.com",ocfDeviceType: "oic.d.light") {
-		capability "Switch Level"
+	definition (name: "ZHC5010v3 fw 2.03 v1", namespace: "boeschricht", author: "boeschricht@gmail.com") {
+// https://docs.smartthings.com/en/latest/capabilities-reference.html#switch
 		capability "Actuator"
-		capability "Indicator"
 		capability "Switch"
-        capability "Button"
-		capability "Polling"
+		capability "Button"
 		capability "Refresh"
-		capability "Sensor"
-		capability "Health Check"
-		capability "Light"
+		capability "Configuration"
+		capability "Indicator"
 
-        //fingerprint deviceId: "0x1001", inClusters: "0x5E, 0x86, 0x72, 0x5A, 0x85, 0x59, 0x73, 0x25, 0x27, 0x70, 0x2C, 0x2B, 0x5B, 0x7A", outClusters: "0x5B"
+		attribute "SecurityEnabled", "boolean"
+		attribute "ep1State", "enum", ["on", "off"]
+
+		command "toggleSecurity"
+		command "toggleEp1State"
+
+		fingerprint type: "1001", mfr: "0234", prod: "0003", model: "010A", sec: "86"
 	}
 
+	// simulator metadata
 	simulator {
-		status "on":  "command: 2003, payload: FF"
-		status "off": "command: 2003, payload: 00"
-		status "09%": "command: 2003, payload: 09"
-		status "10%": "command: 2003, payload: 0A"
-		status "33%": "command: 2003, payload: 21"
-		status "66%": "command: 2003, payload: 42"
-		status "99%": "command: 2003, payload: 63"
-
-		// reply messages
-		reply "2001FF,delay 5000,2602": "command: 2603, payload: FF"
-		reply "200100,delay 5000,2602": "command: 2603, payload: 00"
-		reply "200119,delay 5000,2602": "command: 2603, payload: 19"
-		reply "200132,delay 5000,2602": "command: 2603, payload: 32"
-		reply "20014B,delay 5000,2602": "command: 2603, payload: 4B"
-		reply "200163,delay 5000,2602": "command: 2603, payload: 63"
 	}
 
-	preferences {
-		input "ledIndicator", "enum", title: "LED Indicator", description: "Turn LED indicator... ", required: false, options:["on": "When On", "off": "When Off", "never": "Never"], defaultValue: "off"
-                input "disableSwitchRelay", "bool", title: "Disable the switch physical relay",  defaultValue: false,  displayDuringSetup: true, required: false	       
-
-	}
-
-	tiles(scale: 2) {
-		multiAttributeTile(name:"switch", type: "lighting", width: 6, height: 4, canChangeIcon: true){
-			tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-				attributeState "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#00a0dc", nextState:"turningOff"
-				attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff", nextState:"turningOn"
-				attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#00a0dc", nextState:"turningOff"
-				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff", nextState:"turningOn"
-			}
-			tileAttribute ("device.level", key: "SLIDER_CONTROL") {
-				attributeState "level", action:"switch level.setLevel"
-			}
-
+// https://docs.smartthings.com/en/latest/device-type-developers-guide/tiles-metadata.html
+	tiles {
+		standardTile("switch", "device.switch", width: 2, height: 2, canChangeIcon: true) {
+			state "on", label: '${name}', action: "switch.off", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: '${name}', action: "switch.on", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
 		}
-
-		standardTile("indicator", "device.indicatorStatus", width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
-			state "when off", action:"indicator.indicatorWhenOn", icon:"st.indicators.lit-when-off"
-			state "when on", action:"indicator.indicatorNever", icon:"st.indicators.lit-when-on"
-			state "never", action:"indicator.indicatorWhenOff", icon:"st.indicators.never-lit"
+		standardTile("switchOn", "device.switch", inactiveLabel: false, decoration: "flat") {
+			state "on", label:'on', action:"switch.on", icon:"st.switches.switch.on"
 		}
-
-		standardTile("refresh", "device.switch", width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
+		standardTile("switchOff", "device.switch", inactiveLabel: false, decoration: "flat") {
+			state "off", label:'off', action:"switch.off", icon:"st.switches.switch.off"
+		}
+		standardTile("ep1", "ep1State", width: 2, height: 2, canChangeIcon: true) {
+			state "on", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		}
+		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
-
-		valueTile("level", "device.level", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
-			state "level", label:'${currentValue} %', unit:"%", backgroundColor:"#ffffff"
+		standardTile("Disablesecurity", "SecurityEnabled", width: 1, height: 1) {
+			state "yes", label:'Security\ndisabled\n\n', action:"toggleSecurity", icon: "st.switches.switch.off", backgroundColor: "#00A0DC"
+			state "no", label:'Security\nenabled', action:"toggleSecurity", icon: "st.switches.switch.on", backgroundColor: "#ffffff"
 		}
-
-        valueTile("firmwareVersion", "device.firmwareVersion", width:2, height: 2, decoration: "flat", inactiveLabel: false) {
-			state "default", label: '${currentValue}'
-		        }   
-      	valueTile("buttonTile", "device.buttonNum", width: 2, height: 2) {
-			state("", label:'${currentValue}')
-		        }
-
-		main(["switch"])
-		details(["switch", "level", "refresh","firmwareVersion","buttonTile"])
-
+		main "switch"
+		details (["switch", "switchOn", "switchOff", "ep1", "refresh", "Disablesecurity"])
 	}
-}
 
-def installed() {
-	// Device-Watch simply pings if no device events received for 32min(checkInterval)
-	sendEvent(name: "checkInterval", value: 2 * 15 * 60 + 2 * 60, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID])
-
-	response(refresh())
-}
-
-def updated(){
-	// Device-Watch simply pings if no device events received for 32min(checkInterval)
-	sendEvent(name: "checkInterval", value: 2 * 15 * 60 + 2 * 60, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID])
-  switch (ledIndicator) {
-        case "on":
-            indicatorWhenOn()
-            break
-        case "off":
-            indicatorWhenOff()
-            break
-        case "never":
-            indicatorNever()
-            break
-        default:
-            indicatorWhenOn()
-            break
+    preferences {
+       input "doublePressCancelsSingle", "bool", title: "Cancel Single-Press when followed by Double-Press",  defaultValue: false,  displayDuringSetup: true, required: false
+       input "SwitchRelayButtonNo", "number", title: "Physical relay mapped to button number (1-4)",  defaultValue: 1,  range: "1..4", displayDuringSetup: true, required: true
+       input "disableSwitchRelay", "bool", title: "Disable the switch physical relay",  defaultValue: false,  displayDuringSetup: true, required: true
+       input "disableLED1", "bool", title: "Disable LED #1",  defaultValue: false,  displayDuringSetup: true, required: true
+       input "LED1BriOn", "number", title: "LED1 brightness on",  defaultValue: 50, range:"0..100", displayDuringSetup: true, required: true
+       input "LED1BriOff", "number", title: "LED1 brightness off",  defaultValue: 0, range:"0..100", displayDuringSetup: true, required: true
+       input "disableLED2", "bool", title: "Disable LED #2",  defaultValue: true,  displayDuringSetup: true, required: true
+       input "LED2BriOn", "number", title: "LED2 brightness on",  defaultValue: 50, range:"0..100", displayDuringSetup: true, required: true
+       input "LED2BriOff", "number", title: "LED2 brightness off",  defaultValue: 0, range:"0..100", displayDuringSetup: true, required: true
+       input "disableLED3", "bool", title: "Disable LED #3",  defaultValue: true,  displayDuringSetup: true, required: true
+       input "LED3BriOn", "number", title: "LED3 brightness on",  defaultValue: 50, range:"0..100", displayDuringSetup: true, required: true
+       input "LED3BriOff", "number", title: "LED3 brightness off",  defaultValue: 0, range:"0..100", displayDuringSetup: true, required: true
+       input "disableLED4", "bool", title: "Disable LED #4",  defaultValue: true,  displayDuringSetup: true, required: true
+       input "LED4BriOn", "number", title: "LED4 brightness on",  defaultValue: 50, range:"0..100", displayDuringSetup: true, required: true
+       input "LED4BriOff", "number", title: "LED4 brightness off",  defaultValue: 0, range:"0..100", displayDuringSetup: true, required: true
     }
-}
 
-def getCommandClassVersions() {
-	[
-		0x20: 1,  // Basic
-		0x26: 1,  // SwitchMultilevel
-		0x56: 1,  // Crc16Encap
-		0x70: 1,  // Configuration
-	]
 }
 
 def parse(String description) {
-	def result = null
-	if (description != "updated") {
-		log.debug "parse() >> zwave.parse($description)"
-		def cmd = zwave.parse(description, commandClassVersions)
-		if (cmd) {
-			result = zwaveEvent(cmd)
-		}
-	}
-	if (result?.name == 'hail' && hubFirmwareLessThan("000.011.00602")) {
-		result = [result, response(zwave.basicV1.basicGet())]
-		log.debug "Was hailed: requesting state update"
-	} else {
-		log.debug "Parse returned ${result?.descriptionText}"
-	}
-	return result
+	log.debug("parse(). description: ${description}")
+ 	def result = null
+ 	def cmd = zwave.parse(description, [0x20: 1, 0x25: 1, 0x26: 2, 0x28: 1, 0x59: 1, 0x5A: 1, 0x5B: 1, 0x5E: 2, 0x60: 3, 0x70: 1, 0x72: 2, 0x73: 1, 0x7A: 2, 0x85: 2, 0x86: 1, 0x87: 1, 0x8E: 2, 0x98: 1])
+
+    if (cmd) {
+  		result = zwaveEvent(cmd)
+		log.debug("parse(). result: $result")
+  	}
+    if (!result){
+        log.debug "Parse returned ${result} for command ${cmd}"
+    } else {
+  		log.debug "Parse returned ${result}"
+    }
+ 	return result
 }
+
+// -------------------------------------------------------------------------------
+// events for supported classes
+// -------------------------------------------------------------------------------
 
 def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd) {
-	dimmerEvents(cmd)
+  	createEvent([name: "switch", value: cmd.value ? "on" : "off", type: "physical"])
 }
-
 def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
-	dimmerEvents(cmd)
+  	createEvent([name: "switch", value: cmd.value ? "on" : "off", type: "physical"])
 }
-
-def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv1.SwitchMultilevelReport cmd) {
-	dimmerEvents(cmd)
+def zwaveEvent(physicalgraph.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd) {
+ 	createEvent([name: "switch", value: cmd.value ? "on" : "off", type: "digital"])
 }
-
-def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv1.SwitchMultilevelSet cmd) {
-	dimmerEvents(cmd)
-}
-
-private dimmerEvents(physicalgraph.zwave.Command cmd) {
-	def value = (cmd.value ? "on" : "off")
-	def result = [createEvent(name: "switch", value: value)]
-	if (cmd.value && cmd.value <= 100) {
-		result << createEvent(name: "level", value: cmd.value, unit: "%")
-	}
-	return result
-}
-
-
-def zwaveEvent(physicalgraph.zwave.commands.configurationv1.ConfigurationReport cmd) {
-	log.debug "ConfigurationReport $cmd"
-	def value = "when off"
-	if (cmd.configurationValue[0] == 1) {value = "when on"}
-	if (cmd.configurationValue[0] == 2) {value = "never"}
-	createEvent([name: "indicatorStatus", value: value])
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.hailv1.Hail cmd) {
-	createEvent([name: "hail", value: "hail", descriptionText: "Switch button was pressed", displayed: false])
-}
-
 def zwaveEvent(physicalgraph.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
-	log.debug "manufacturerId:   ${cmd.manufacturerId}"
-	log.debug "manufacturerName: ${cmd.manufacturerName}"
-    state.manufacturer=cmd.manufacturerName
-	log.debug "productId:        ${cmd.productId}"
-	log.debug "productTypeId:    ${cmd.productTypeId}"
-	def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-	updateDataValue("MSR", msr)
-	updateDataValue("manufacturer", cmd.manufacturerName)
-    setFirmwareVersion()
-	createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: false])
+  	if (state.manufacturer != cmd.manufacturerName) {
+ 		createEvent(updateDataValue("manufacturer", cmd.manufacturerName))
+ 	}
 }
-
-def zwaveEvent(physicalgraph.zwave.commands.versionv1.VersionReport cmd) {	
-    //updateDataValue("applicationVersion", "${cmd.applicationVersion}")
-    log.debug ("received Version Report")
-    log.debug "applicationVersion:      ${cmd.applicationVersion}"
-    log.debug "applicationSubVersion:   ${cmd.applicationSubVersion}"
-    state.firmwareVersion=cmd.applicationVersion+'.'+cmd.applicationSubVersion
-    log.debug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
-    log.debug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
-    log.debug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
-    setFirmwareVersion()
-    createEvent([descriptionText: "Firmware V"+state.firmwareVersion, isStateChange: false])
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv1.SwitchMultilevelStopLevelChange cmd) {
-	[createEvent(name:"switch", value:"on"), response(zwave.switchMultilevelV1.switchMultilevelGet().format())]
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.crc16encapv1.Crc16Encap cmd) {
-	def versions = commandClassVersions
-	def version = versions[cmd.commandClass as Integer]
-	def ccObj = version ? zwave.commandClass(cmd.commandClass, version) : zwave.commandClass(cmd.commandClass)
-	def encapsulatedCommand = ccObj?.command(cmd.command)?.parse(cmd.data)
+def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
+    //log.debug "SecurityMessageEncapsulation. cmd: ${cmd}"
+	def encapsulatedCommand = cmd.encapsulatedCommand([0x20: 1, 0x25: 1, 0x26: 2, 0x28: 1, 0x59: 1, 0x5A: 1, 0x5B: 1, 0x5E: 2, 0x60: 3, 0x70: 1, 0x72: 2, 0x73: 1, 0x7A: 2, 0x85: 2, 0x86: 1, 0x87: 1, 0x8E: 2, 0x98: 1])
+    log.debug("encapsulatedCommand: ${encapsulatedCommand}")
+	state.sec = 1
 	if (encapsulatedCommand) {
 		zwaveEvent(encapsulatedCommand)
+	} else {
+		log.warn "Unable to extract encapsulated cmd from $cmd"
+		createEvent(descriptionText: cmd.toString())
 	}
 }
-
+def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
+	response(configure())
+}
 def zwaveEvent(physicalgraph.zwave.Command cmd) {
 	// Handles all Z-Wave commands we aren't interested in
-	[:]
+    log.debug "unrecognized cmd: ${cnd}"
+    createEvent([:])
 }
 
-def on() {
-	delayBetween([
-			zwave.basicV1.basicSet(value: 0xFF).format(),
-			zwave.switchMultilevelV1.switchMultilevelGet().format()
-	],5000)
-}
-
-def off() {
-	delayBetween([
-			zwave.basicV1.basicSet(value: 0x00).format(),
-			zwave.switchMultilevelV1.switchMultilevelGet().format()
-	],5000)
-}
-
-def setLevel(value) {
-	log.debug "setLevel >> value: $value"
-	def valueaux = value as Integer
-	def level = Math.max(Math.min(valueaux, 99), 0)
-	if (level > 0) {
-		sendEvent(name: "switch", value: "on")
-	} else {
-		sendEvent(name: "switch", value: "off")
-	}
-	sendEvent(name: "level", value: level, unit: "%")
-	delayBetween ([zwave.basicV1.basicSet(value: level).format(), zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
-}
-
-def setLevel(value, duration) {
-	log.debug "setLevel >> value: $value, duration: $duration"
-	def valueaux = value as Integer
-	def level = Math.max(Math.min(valueaux, 99), 0)
-	def dimmingDuration = duration < 128 ? duration : 128 + Math.round(duration / 60)
-	def getStatusDelay = duration < 128 ? (duration*1000)+2000 : (Math.round(duration / 60)*60*1000)+2000
-	delayBetween ([zwave.switchMultilevelV2.switchMultilevelSet(value: level, dimmingDuration: dimmingDuration).format(),
-				   zwave.switchMultilevelV1.switchMultilevelGet().format()], getStatusDelay)
-}
-
-def poll() {
-	zwave.switchMultilevelV1.switchMultilevelGet().format()
-}
-
-/**
- * PING is used by Device-Watch in attempt to reach the Device
- * */
-def ping() {
-	refresh()
-}
-
-def refresh() {
-	log.debug "refresh() is called"
-	def commands = []
-	commands << zwave.switchMultilevelV1.switchMultilevelGet().format()
-	if (getDataValue("MSR") == null) {
-		commands << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
-	}
-    if (disableSwitchRelay) {
-        commands << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 15, size: 1).format()
-    }
-    sendEvent(name: "numberOfButtons", value: 12, displayed: false)
-	delayBetween(commands,100)
-}
-
-void indicatorWhenOn() {
-	sendEvent(name: "indicatorStatus", value: "when on", displayed: false)
-	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()))
-}
-
-void indicatorWhenOff() {
-	sendEvent(name: "indicatorStatus", value: "when off", displayed: false)
-	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()))
-}
-
-void indicatorNever() {
-	sendEvent(name: "indicatorStatus", value: "never", displayed: false)
-	sendHubCommand(new physicalgraph.device.HubAction(zwave.configurationV1.configurationSet(configurationValue: [2], parameterNumber: 3, size: 1).format()))
-}
-
-def invertSwitch(invert=true) {
-	if (invert) {
-		zwave.configurationV1.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
-	}
-	else {
-		zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
-	}
-}
-
+// Support functions for scenenotification
 def pressedButton (def btnRes) {
-  
   def canceling = false
-  
+
   if (state.doublePressed1 && btnRes ==1) {
      canceling = true
      state.doublePressed1 = false
@@ -348,94 +180,99 @@ def pressedButton (def btnRes) {
      canceling = true
      state.doublePressed4 = false
   }
-  
+
   if (canceling) {
-         log.debug ("Canceling single press for button $btnRes")
+         //log.debug ("Canceling single press for button $btnRes")
          state.doublePressed=false
   }
   else
      {
-         log.debug ("button $btnRes pushed")
+         //log.debug ("button $btnRes pushed")
          sendEvent(name: "buttonNum" , value: "Btn: $btnRes pushed")
          sendEvent([name: "button", value: "pushed", data: [buttonNumber: "$btnRes"], descriptionText: "$device.displayName $btnRes pressed", isStateChange: true, type: "physical"])
        }
 }
-
 def pressedButton1() {
    pressedButton (1)
 }
-
 def pressedButton2() {
    pressedButton (2)
 }
-
 def pressedButton3() {
    pressedButton (3)
 }
-
 def pressedButton4() {
    pressedButton (4)
 }
-
 def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotification cmd) {
-    log.debug("sceneNumber: ${cmd.sceneNumber} keyAttributes: ${cmd.keyAttributes}")
-    //def result = []
-
+    //log.debug("sceneNumber: ${cmd.sceneNumber} keyAttributes: ${cmd.keyAttributes}")
+    def result = []
     switch (cmd.keyAttributes) {
        case 0:
            //pressed
            def buttonResult = cmd.sceneNumber
-           if (doublePressCancelsSingle)
-           {
+           if (doublePressCancelsSingle) {
              switch (buttonResult) {
                case 1:
                   state.doublePressed1=false
-                  runIn (1, pressedButton1) 
+                  runIn (1, pressedButton1)
                   break
                case 2:
                   state.doublePressed2=false
-                  runIn (1, pressedButton2)  
+                  runIn (1, pressedButton2)
                   break
                case 3:
                   state.doublePressed3=false
-                  runIn (1, pressedButton3) 
+                  runIn (1, pressedButton3)
                   break
                case 4:
                   state.doublePressed4=false
-                  runIn (1, pressedButton4)  
+                  runIn (1, pressedButton4)
                   break
                default:
-                 log.debug ("unexpected button $buttonNum")
+                 //log.debug ("unexpected button $buttonNum")
+                 break
              }
+           } else {
+				sendEvent(name: "buttonNum" , value: "Btn: $buttonResult pushed")
+             	result=createEvent([name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"],
+                	descriptionText: "$device.displayName $buttonResult pressed", isStateChange: true, type: "physical"])
            }
-           else
-           {
-             sendEvent(name: "buttonNum" , value: "Btn: $buttonResult pushed")
-             sendEvent(name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"], 
-                descriptionText: "$device.displayName $buttonResult pressed", isStateChange: true, type: "physical")
-           }
-           
-           break
- 
+
+           // if button pressed is button for physical relay, then toggle switch state
+           if (! disableSwitchRelay) {
+           		//log.debug("SwitchRelayButtonNo: $SwitchRelayButtonNo")
+                //log.debug("buttonResult: ${buttonResult}")
+                if (SwitchRelayButtonNo == $buttonResult) { // button for physical relay pressed
+                	//log.debug("switch.currentSwitch: ${device.currentValue('switch')}")
+                    if (device.currentValue('switch') == "on") {
+	                    sendEvent(name: "switch" , value: "off")
+                    } else {
+	                    sendEvent(name: "switch" , value: "on")
+                    }
+                }
+            }
+            break
+
        case 1:
            //released
            def buttonResult = cmd.sceneNumber
            sendEvent(name: "buttonNum" , value: "Btn: $buttonResult released")
-           sendEvent(name: "button", value: "released", data: [buttonNumber: "$buttonResult"], 
-                         descriptionText: "$device.displayName $buttonResult released", isStateChange: true, type: "physical")
+           result=createEvent([name: "button", value: "released", data: [buttonNumber: "$buttonResult"],
+                         descriptionText: "$device.displayName $buttonResult released", isStateChange: true, type: "physical"])
            break
-       
+
        case 2:
            //held
            def buttonResult = cmd.sceneNumber
-           sendEvent(name: "button", value: "held", data: [buttonNumber: "$buttonResult"], 
-                         descriptionText: "$device.displayName $buttonResult held", isStateChange: true, type: "physical")
+           result=createEvent([name: "button", value: "held", data: [buttonNumber: "$buttonResult"],
+                         descriptionText: "$device.displayName $buttonResult held", isStateChange: true, type: "physical"])
            break
-    
+
        case 3:
            //double press
            def buttonResult = cmd.sceneNumber + 4
-           
+
            switch (buttonResult) {
            case 5:
               state.doublePressed1=true
@@ -452,50 +289,173 @@ def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotificat
            default:
               log.debug ("unexpected double press button: $buttonResult")
            }
-              
-           sendEvent(name: "buttonNum" , value: "Btn: $buttonResult double press")
-           sendEvent(name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"], 
-                         descriptionText: "$device.displayName $buttonResult double-pressed", isStateChange: true, type: "physical")
-           break                  
 
-       case 4:
+           sendEvent(name: "buttonNum" , value: "Btn: $buttonResult double press")
+           result=createEvent([name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"],
+                         descriptionText: "$device.displayName $buttonResult double-pressed", isStateChange: true, type: "physical"])
+           break
+
+	   case 4:
            //triple press -- not currently supported
+           log.debug("tripple press")
            def buttonResult = cmd.sceneNumber + 8
            sendEvent(name: "buttonNum" , value: "Btn: $buttonResult double press")
-           sendEvent(name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"], 
-                         descriptionText: "$device.displayName $buttonResult double-pressed", isStateChange: true, type: "physical")
-           break                  
+           result=createEvent([name: "button", value: "pushed", data: [buttonNumber: "$buttonResult"],
+                         descriptionText: "$device.displayName $buttonResult double-pressed", isStateChange: true, type: "physical"])
+           break
 
-
-      default:
+	  default:
            // unexpected case
-
-
            log.debug ("unexpected attribute: $cmd.keyAttributes")
-   }  
-   zwave.switchMultilevelV1.switchMultilevelGet().format()
+   }
+   return result
 }
 
-def setFirmwareVersion() {
-   def versionInfo = ''
-   if (state.manufacturer)
-   {
-      versionInfo=state.manufacturer+' '
-   }
-   if (state.firmwareVersion)
-   {
-      versionInfo=versionInfo+"Firmware V"+state.firmwareVersion
-   }
-   else 
-   {
-     versionInfo=versionInfo+"Firmware unknown"
-   }   
-   sendEvent(name: "firmwareVersion",  value: versionInfo, isStateChange: true)
+def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelEndPointReport  cmd) {
+  	return createEvent(descriptionText: "Number of endpoints: $cmd.endPoints. Type: ${ cmd.dynamic ? "dynamic" : "static"}. Identical: ${ cmd.identical }")
+
 }
 
+
+// -------------------------------------------------------------------------------
+// commands dictated by "capability "Switch""
+// -------------------------------------------------------------------------------
+def on() {
+//    def cmds = []
+//    cmds << zwave.configurationV1.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
+//    delayBetween(cmds, 500)
+	commands([zwave.basicV1.basicSet(value: 0xFF), zwave.basicV1.basicGet()], 1000)
+}
+
+def off() {
+	commands([zwave.basicV1.basicSet(value: 0x00), zwave.basicV1.basicGet()], 1000)
+}
+
+// -------------------------------------------------------------------------------
+// commands dictated by "capability "Configuration""
+// -------------------------------------------------------------------------------
 def configure() {
-     sendEvent(name: "numberOfButtons", value: 12, displayed: false)
-     if (disableSwitchRelay) {
-        zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 15, size: 1).format()
-     }
+    // update numberOfButtons attribute from switch capability
+	sendEvent(name: "numberOfButtons", value: 12, displayed: false)
+    commands([
+		zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED1BriOn], parameterNumber: 7, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED2BriOn], parameterNumber: 8, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED3BriOn], parameterNumber: 9, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED4BriOn], parameterNumber: 10, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED1BriOff], parameterNumber: 11, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED2BriOff], parameterNumber: 12, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED3BriOff], parameterNumber: 13, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [LED4BriOff], parameterNumber: 14, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: disableSwitchRelay ? [0] : [SwitchRelayButtonNo], parameterNumber: 15, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
+		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 33, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 34, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 35, size: 1 ),
+		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 36, size: 1 )
+	], 2000)
+}
+
+// -------------------------------------------------------------------------------
+// Updated routine, called when changing preferences
+// -------------------------------------------------------------------------------
+
+def updated() {
+	log.debug("updated()")
+    // def cmds = []
+    // commands([
+		// zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED1BriOn], parameterNumber: 7, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED2BriOn], parameterNumber: 8, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED3BriOn], parameterNumber: 9, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED4BriOn], parameterNumber: 10, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED1BriOff], parameterNumber: 11, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED2BriOff], parameterNumber: 12, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED3BriOff], parameterNumber: 13, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [LED4BriOff], parameterNumber: 14, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: disableSwitchRelay ? [0] : [SwitchRelayButtonNo], parameterNumber: 15, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
+		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
+	// ], 2000)
+}
+
+def refresh() {
+	log.debug("refresh()")
+
+	commands([
+//		zwave.multiChannelV3.multiChannelEndPointGet(),
+//		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
+//		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2),
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x25, command: 1, parameter: [0]),
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x25, command: 2),
+		zwave.basicV1.basicGet()
+	])
+}
+
+def toggleSecurity() {
+	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+
+	if (device.currentValue('SecurityEnabled') == "yes") {
+	    commands([
+			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 33, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 34, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 35, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 36, size: 1 )
+		], 2000)
+
+		sendEvent(name: "SecurityEnabled" , value: "no")
+	} else {
+	    commands([
+			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
+			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
+		], 2000)
+
+		sendEvent(name: "SecurityEnabled" , value: "yes")
+	}
+	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+}
+
+def toggleEp1State() {
+	if (device.currentValue('ep1State') == "on") {
+	commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2)
+	], 2000)
+
+		sendEvent(name: "ep1State" , value: "off")
+	} else {
+	commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0xFF]),
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2)
+	], 2000)
+
+		sendEvent(name: "ep1State" , value: "on")
+	}
+
+}
+
+
+private command(physicalgraph.zwave.Command cmd) {
+	//log.debug("state.sec: ${state.sec}")
+    if (state.sec) {
+		log.debug("cmd: ${cmd} ")
+		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
+	} else {
+		cmd.format()
+	}
+}
+
+private commands(commands, delay=250) {
+	delayBetween(commands.collect{ command(it) }, delay)
 }
