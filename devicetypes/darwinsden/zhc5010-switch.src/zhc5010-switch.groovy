@@ -16,9 +16,19 @@
  *	Date: 2019-01-06
  *
  *	Changelog:
- *  0.2	(boeschricht@gmail.com)				      -   Fixes:
- *																								- improved support for security command class
- *  0.1 (02/07/2017, boeschricht@gmail.com) -  Major improvements of handler code for firmware 1.10.
+ *  1.2 (06-01-2019, boeschricht@gmail.com) -   Fixes:
+ *                                                - Added GUI options to control encryption for endpoint communication
+ *                                                - Updated fingerprint for better driver detection
+ *                                                - Added GUI on/off button
+ *                                                - Improved support for multichannel command class
+ *                                               To do:
+ *                                                - multichannel
+ *                                                - gui ep buttons for sim
+ *                                                -
+ *
+ *  1.1	(boeschricht@gmail.com)                 Fixes:
+ *						  - improved support for security command class required by firmware 2.03
+ *  1.0 (02/07/2017, boeschricht@gmail.com) -  Major improvements of handler code for firmware 1.10.
  *                                              Improved Simulator support
  *                                              Fixes:
  *                                              Added support for command classes:
