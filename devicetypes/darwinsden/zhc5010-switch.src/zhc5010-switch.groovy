@@ -352,9 +352,9 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelEndPointR
 
 def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap  cmd) {
 	// MultiChannelCmdEncap(destinationEndPoint: 0, parameter: [99, 0], sourceEndPoint: 1, command: 3, commandClass: 135, bitAddress: false)
-	log.debug("$cmd")
-	log.debug("cmd.command: $cmd.command")
-	log.debug("cmd.commandClass: $cmd.commandClass")
+	// log.debug("$cmd")
+	// log.debug("cmd.command: $cmd.command")
+	// log.debug("cmd.commandClass: $cmd.commandClass")
 	def ep = cmd.sourceEndPoint
 	def map = [:]
 	if (cmd.commandClass == 0x87 && cmd.command == 3) {
@@ -380,10 +380,6 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap 
 		log.debug("map: $map")
 		return map
 	}
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.indicatorv1.IndicatorReport cmd) {
-  	log.debug("$cmd")
 }
 
 
