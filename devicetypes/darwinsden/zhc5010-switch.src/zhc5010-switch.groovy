@@ -41,7 +41,6 @@
  *                                               - Disabling House Cleaning Mode (double press sends dimming command for 100% light level)
  *
  */
- */
 
 
 metadata {
@@ -79,7 +78,7 @@ metadata {
 		standardTile("switchOff", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "off", label:'off', action:"switch.off", icon:"st.switches.switch.off"
 		}
-		standardTile("ep1", "ep1State", width: 2, height: 2, canChangeIcon: true) {
+		standardTile("ep1", "ep1State", width: 1, height: 1, canChangeIcon: true) {
 			state "on", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
 			state "off", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
 		}
@@ -439,6 +438,7 @@ def toggleSecurity() {
 }
 
 def toggleEp1State() {
+        log.debug("her1")
 	if (device.currentValue('ep1State') == "on") {
 	commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
 		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2)
