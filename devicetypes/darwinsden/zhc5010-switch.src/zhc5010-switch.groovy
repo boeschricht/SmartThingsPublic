@@ -106,6 +106,9 @@ metadata {
 			state "on", label: 'LED 4', action: "toggleLED4State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
 			state "off", label: 'LED 4', action: "toggleLED4State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
 		}
+		standardTile("configure", "device.configure", decoration: "flat") {
+			state "configure", label:'', action:"configuration.configure", icon:"st.secondary.configure"
+		}
 		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
@@ -115,7 +118,7 @@ metadata {
 		// }
 		main "switch"
 		// details (["switch", "switchOn", "switchOff", "ep1", "refresh", "Disablesecurity"])
-		details (["switch", "switchOn", "switchOff", "LED1", "LED2", "LED3", "LED4", "refresh"])
+		details (["switch", "switchOn", "switchOff", "LED1", "LED2", "LED3", "LED4", "configure", "refresh"])
 	}
 
     preferences {
@@ -401,31 +404,7 @@ def off() {
 // commands dictated by "capability "Configuration""
 // -------------------------------------------------------------------------------
 def configure() {
-    // update numberOfButtons attribute from switch capability
-	sendEvent(name: "numberOfButtons", value: 12, displayed: false)
-    commands([
-		zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED1BriOn], parameterNumber: 7, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED2BriOn], parameterNumber: 8, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED3BriOn], parameterNumber: 9, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED4BriOn], parameterNumber: 10, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED1BriOff], parameterNumber: 11, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED2BriOff], parameterNumber: 12, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED3BriOff], parameterNumber: 13, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [LED4BriOff], parameterNumber: 14, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: disableSwitchRelay ? [0] : [SwitchRelayButtonNo], parameterNumber: 15, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
-		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 33, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 34, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 35, size: 1 ),
-		zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 36, size: 1 )
-	], 2000)
+	log.debug("Configure()")
 }
 
 // -------------------------------------------------------------------------------
@@ -434,31 +413,58 @@ def configure() {
 
 def updated() {
 	log.debug("updated()")
-    // def cmds = []
-    // commands([
-		// zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED1BriOn], parameterNumber: 7, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED2BriOn], parameterNumber: 8, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED3BriOn], parameterNumber: 9, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED4BriOn], parameterNumber: 10, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED1BriOff], parameterNumber: 11, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED2BriOff], parameterNumber: 12, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED3BriOff], parameterNumber: 13, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [LED4BriOff], parameterNumber: 14, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: disableSwitchRelay ? [0] : [SwitchRelayButtonNo], parameterNumber: 15, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
-		// zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
-	// ], 2000)
+	// update numberOfButtons attribute from switch capability
+    	sendEvent(name: "numberOfButtons", value: 12, displayed: false)
+    	def cmds = []
+
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED1BriOn], parameterNumber: 7, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED2BriOn], parameterNumber: 8, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED3BriOn], parameterNumber: 9, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED4BriOn], parameterNumber: 10, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED1BriOff], parameterNumber: 11, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED2BriOff], parameterNumber: 12, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED3BriOff], parameterNumber: 13, size: 1 )
+	// cmds << zwave.configurationV1.configurationSet(configurationValue: [LED4BriOff], parameterNumber: 14, size: 1 )
+    	if (disableLED1) {
+log.debug("disableLED1:$disableLED1")
+		cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x87, command: 1, parameter: [0])
+    		cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x87, command: 2)
+		// cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 )
+    	} else {
+    		cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED1 ? [0] : [1], parameterNumber: 3, size: 1 )
+    		cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x87, command: 2)
+    	}
+    	// if (disableLED2) {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 2, commandClass: 0x87, command: 1, parameter: [0])
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 2, commandClass: 0x87, command: 2)
+    	// } else {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED2 ? [0] : [1], parameterNumber: 4, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 2, commandClass: 0x87, command: 2)
+    	// }
+    	// if (disableLED3) {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x87, command: 1, parameter: [0])
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x87, command: 2)
+    	// } else {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED3 ? [0] : [1], parameterNumber: 5, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x87, command: 2)
+    	// }
+    	// if (disableLED4) {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 4, commandClass: 0x87, command: 1, parameter: [0])
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 4, commandClass: 0x87, command: 2)
+    	// } else {
+    	// 	cmds << zwave.configurationV1.configurationSet(configurationValue: disableLED4 ? [0] : [1], parameterNumber: 6, size: 1 )
+    	// 	cmds <<	zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 4, commandClass: 0x87, command: 2)
+    	// }
+
+
+        commands(cmds, 2000)
 }
 
 def refresh() {
 	log.debug("refresh()")
-	log.debug("her2")
 	commands([
 //		zwave.multiChannelV3.multiChannelEndPointGet(),
 //		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
@@ -541,7 +547,8 @@ def toggleLEDState(LEDnum) {
 
 
 private command(physicalgraph.zwave.Command cmd) {
-	log.debug("state.sec: ${state.sec}")
+	// log.debug("cmd:$cmd")
+	// log.debug("state.sec: ${state.sec}")
     if (state.sec) {
 		log.debug("cmd: ${cmd} ")
 		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
