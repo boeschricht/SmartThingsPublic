@@ -16,11 +16,12 @@
  *	Date: 2019-01-06
  *
  *	Changelog:
- *  1.2 (06-01-2019, boeschricht@gmail.com) -   Fixes:
+ *  1.2 (06-01-2019, boeschricht@gmail.com) -   Fixes and improvements:
  *                                                - Added GUI options to control encryption for endpoint communication
  *                                                - Updated fingerprint for better driver detection
  *                                                - Added GUI on/off button
  *                                                - Improved support for multichannel command class
+ *                                                - Added command for controlling LED indicators programmatically and using GUI.
  *                                               To do:
  *                                                - multichannel
  *                                                - gui ep buttons for sim
@@ -54,10 +55,17 @@ metadata {
 		capability "Indicator"
 
 		attribute "SecurityEnabled", "boolean"
-		attribute "ep1State", "enum", ["on", "off"]
+		// attribute "LED1State", "enum", ["on", "off"]
+		attribute "LED1State", "enum", ["on", "off"]
+		attribute "LED2State", "enum", ["on", "off"]
+		attribute "LED3State", "enum", ["on", "off"]
+		attribute "LED4State", "enum", ["on", "off"]
 
 		command "toggleSecurity"
-		command "toggleEp1State"
+		command "toggleLED1State"
+		command "toggleLED2State"
+		command "toggleLED3State"
+		command "toggleLED4State"
 
 		fingerprint type: "1001", mfr: "0234", prod: "0003", model: "010A", sec: "86"
 	}
@@ -78,19 +86,36 @@ metadata {
 		standardTile("switchOff", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "off", label:'off', action:"switch.off", icon:"st.switches.switch.off"
 		}
-		standardTile("ep1", "ep1State", width: 1, height: 1, canChangeIcon: true) {
-			state "on", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
-			state "off", label: 'ep 1', action: "toggleEp1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		// standardTile("ep1", "LED1State", width: 1, height: 1, canChangeIcon: true) {
+		// 	state "on", label: 'ep 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+		// 	state "off", label: 'ep 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		// }
+		standardTile("LED1", "LED1State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'LED 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: 'LED 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		}
+		standardTile("LED2", "LED2State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'LED 2', action: "toggleLED2State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: 'LED 2', action: "toggleLED2State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		}
+		standardTile("LED3", "LED3State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'LED 3', action: "toggleLED3State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: 'LED 3', action: "toggleLED3State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
+		}
+		standardTile("LED4", "LED4State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'LED 4', action: "toggleLED4State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
+			state "off", label: 'LED 4', action: "toggleLED4State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
 		}
 		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
-		standardTile("Disablesecurity", "SecurityEnabled", width: 1, height: 1) {
-			state "yes", label:'Security\ndisabled\n\n', action:"toggleSecurity", icon: "st.switches.switch.off", backgroundColor: "#00A0DC"
-			state "no", label:'Security\nenabled', action:"toggleSecurity", icon: "st.switches.switch.on", backgroundColor: "#ffffff"
-		}
+		// standardTile("Disablesecurity", "SecurityEnabled", width: 1, height: 1) {
+		// 	state "yes", label:'Security\ndisabled\n\n', action:"toggleSecurity", icon: "st.switches.switch.off", backgroundColor: "#00A0DC"
+		// 	state "no", label:'Security\nenabled', action:"toggleSecurity", icon: "st.switches.switch.on", backgroundColor: "#ffffff"
+		// }
 		main "switch"
-		details (["switch", "switchOn", "switchOff", "ep1", "refresh", "Disablesecurity"])
+		// details (["switch", "switchOn", "switchOff", "ep1", "refresh", "Disablesecurity"])
+		details (["switch", "switchOn", "switchOff", "LED1", "LED2", "LED3", "LED4", "refresh"])
 	}
 
     preferences {
@@ -325,6 +350,42 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelEndPointR
 
 }
 
+def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap  cmd) {
+	// MultiChannelCmdEncap(destinationEndPoint: 0, parameter: [99, 0], sourceEndPoint: 1, command: 3, commandClass: 135, bitAddress: false)
+	log.debug("$cmd")
+	log.debug("cmd.command: $cmd.command")
+	log.debug("cmd.commandClass: $cmd.commandClass")
+	def ep = cmd.sourceEndPoint
+	def map = [:]
+	if (cmd.commandClass == 0x87 && cmd.command == 3) {
+		switch(ep) {
+			case 1:
+				map << [ name: "LED1State" ]
+			break
+			case 2:
+				map << [ name: "LED2State" ]
+			break
+			case 3:
+				map << [ name: "LED3State" ]
+			break
+			case 4:
+				map << [ name: "LED4State" ]
+			break
+		}
+		if (cmd.parameter == [0]) {
+			map.value = "off"
+		} else  {
+			map.value = "on"
+		}
+		log.debug("map: $map")
+		return map
+	}
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.indicatorv1.IndicatorReport cmd) {
+  	log.debug("$cmd")
+}
+
 
 // -------------------------------------------------------------------------------
 // commands dictated by "capability "Switch""
@@ -401,63 +462,90 @@ def updated() {
 
 def refresh() {
 	log.debug("refresh()")
-
+	log.debug("her2")
 	commands([
 //		zwave.multiChannelV3.multiChannelEndPointGet(),
 //		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
 //		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2),
-		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x25, command: 1, parameter: [0]),
-		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 3, commandClass: 0x25, command: 2),
-		zwave.basicV1.basicGet()
-	])
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x87, command: 1, parameter: [0xFF]),
+		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x87, command: 2)
+	], 2000)
 }
 
-def toggleSecurity() {
-	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+// def toggleSecurity() {
+// 	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+//
+// 	if (device.currentValue('SecurityEnabled') == "yes") {
+// 	    commands([
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 33, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 34, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 35, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 36, size: 1 )
+// 		], 2000)
+//
+// 		sendEvent(name: "SecurityEnabled" , value: "no")
+// 	} else {
+// 	    commands([
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
+// 			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
+// 		], 2000)
+//
+// 		sendEvent(name: "SecurityEnabled" , value: "yes")
+// 	}
+// 	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+// }
 
-	if (device.currentValue('SecurityEnabled') == "yes") {
-	    commands([
-			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 33, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 34, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 35, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x00], parameterNumber: 36, size: 1 )
-		], 2000)
-
-		sendEvent(name: "SecurityEnabled" , value: "no")
-	} else {
-	    commands([
-			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 33, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 34, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 35, size: 1 ),
-			zwave.configurationV1.configurationSet(configurationValue: [0x3F], parameterNumber: 36, size: 1 )
-		], 2000)
-
-		sendEvent(name: "SecurityEnabled" , value: "yes")
-	}
-	log.debug("device.currentValue('SecurityEnabled'): ${device.currentValue('SecurityEnabled')}")
+def toggleLED1State() {
+	toggleLEDState(1)
+}
+def toggleLED2State() {
+	toggleLEDState(2)
+}
+def toggleLED3State() {
+	toggleLEDState(3)
+}
+def toggleLED4State() {
+	toggleLEDState(4)
 }
 
-def toggleEp1State() {
-        log.debug("her1")
-	if (device.currentValue('ep1State') == "on") {
-	commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0]),
-		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2)
-	], 2000)
-
-		sendEvent(name: "ep1State" , value: "off")
-	} else {
-	commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 1, parameter: [0xFF]),
-		zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: 1, commandClass: 0x25, command: 2)
-	], 2000)
-
-		sendEvent(name: "ep1State" , value: "on")
+def toggleLEDState(LEDnum) {
+        // log.debug("device.currentValue('LED1State'): ${device.currentValue('LED1State')}")
+	def sAttribute = ""
+	switch (LEDnum) {
+		case 1:
+			sAttribute = "LED1State"
+		break
+		case 2:
+			sAttribute = "LED2State"
+		break
+		case 3:
+			sAttribute = "LED3State"
+		break
+		case 4:
+			sAttribute = "LED4State"
+		break
 	}
+	if (device.currentValue(sAttribute) == "on") {
+		sendEvent(name: "$sAttribute" , value: "off")
 
+		commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: LEDnum, commandClass: 0x87, command: 1, parameter: [0]),
+			zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: LEDnum, commandClass: 0x87, command: 2)
+		], 2000)
+
+	} else {
+		sendEvent(name: "$sAttribute" , value: "on")
+
+		commands([zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: LEDnum, commandClass: 0x87, command: 1, parameter: [0xFF]),
+			zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, destinationEndPoint: LEDnum, commandClass: 0x87, command: 2)
+		], 2000)
+	}
 }
 
 
 private command(physicalgraph.zwave.Command cmd) {
-	//log.debug("state.sec: ${state.sec}")
+	log.debug("state.sec: ${state.sec}")
     if (state.sec) {
 		log.debug("cmd: ${cmd} ")
 		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
