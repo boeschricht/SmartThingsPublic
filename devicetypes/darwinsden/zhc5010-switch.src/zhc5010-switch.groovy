@@ -60,14 +60,24 @@ metadata {
 		attribute "LED2State", "enum", ["on", "off", "auto"]
 		attribute "LED3State", "enum", ["on", "off", "auto"]
 		attribute "LED4State", "enum", ["on", "off", "auto"]
-		attribute "LastSceneSequenceNumber", "number"
+		attribute "switch1State", "enum", ["on", "off"]
+		attribute "switch2State", "enum", ["on", "off"]
+		attribute "switch3State", "enum", ["on", "off"]
+		attribute "switch4State", "enum", ["on", "off"]
 
 		// command "toggleSecurity"
 		command "toggleLED1State"
 		command "toggleLED2State"
 		command "toggleLED3State"
 		command "toggleLED4State"
-
+		command "switch1on"
+		command "switch1off"
+		command "switch2on"
+		command "switch2off"
+		command "switch3on"
+		command "switch3off"
+		command "switch4on"
+		command "switch4off"
 		command "test"
 
 		fingerprint type: "1001", mfr: "0234", prod: "0003", model: "010A", sec: "86"
@@ -89,10 +99,22 @@ metadata {
 		standardTile("switchOff", "device.switch", inactiveLabel: false, decoration: "flat") {
 			state "off", label:'off', action:"switch.off", icon:"st.switches.switch.off"
 		}
-		// standardTile("ep1", "LED1State", width: 1, height: 1, canChangeIcon: true) {
-		// 	state "on", label: 'ep 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#00A0DC"
-		// 	state "off", label: 'ep 1', action: "toggleLED1State", icon: "st.unknown.zwave.device", backgroundColor: "#ffffff"
-		// }
+		standardTile("switch1", "switch1State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'switch1', action: "switch1off", icon: "st.Home.home30", backgroundColor: "#00A0DC"
+			state "off", label: 'switch1', action: "switch1on", icon: "st.Home.home30", backgroundColor: "#ffffff"
+		}
+		standardTile("switch2", "switch2State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'switch2', action: "switch2off", icon: "st.Home.home30", backgroundColor: "#00A0DC"
+			state "off", label: 'switch2', action: "switch2on", icon: "st.Home.home30", backgroundColor: "#ffffff"
+		}
+		standardTile("switch3", "switch3State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'switch3', action: "switch3off", icon: "st.Home.home30", backgroundColor: "#00A0DC"
+			state "off", label: 'switch3', action: "switch3on", icon: "st.Home.home30", backgroundColor: "#ffffff"
+		}
+		standardTile("switch4", "switch4State", width: 1, height: 1, canChangeIcon: true) {
+			state "on", label: 'switch4', action: "switch4off", icon: "st.Home.home30", backgroundColor: "#00A0DC"
+			state "off", label: 'switch4', action: "switch4on", icon: "st.Home.home30", backgroundColor: "#ffffff"
+		}
 		standardTile("LED1", "LED1State", width: 1, height: 1, canChangeIcon: true, decoration: "flat") {
 			state "on", label:'LED1 on', action: "toggleLED1State", icon: "st.illuminance.illuminance.bright", backgroundColor: "#00A0DC"
 			state "off", label:'LED1 off', action: "toggleLED1State", icon: "st.illuminance.illuminance.dark", backgroundColor: "#ffffff"
@@ -127,7 +149,7 @@ metadata {
 		// 	state "no", label:'Security\nenabled', action:"toggleSecurity", icon: "st.switches.switch.on", backgroundColor: "#ffffff"
 		// }
 		main "switch"
-		details (["switch", "switchOn", "switchOff", "LED1", "LED2", "LED3", "LED4", "configure", "test", "refresh"])
+		details (["switch", "switchOn", "switchOff", "switch1", "switch2", "switch3", "switch4", "LED1", "LED2", "LED3", "LED4", "configure", "test", "refresh"])
 	}
 
     preferences {
@@ -188,7 +210,7 @@ def zwaveEvent(physicalgraph.zwave.commands.manufacturerspecificv2.ManufacturerS
 def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
     //log.debug "SecurityMessageEncapsulation. cmd: ${cmd}"
 	def encapsulatedCommand = cmd.encapsulatedCommand([0x20: 1, 0x25: 1, 0x26: 2, 0x28: 1, 0x59: 1, 0x5A: 1, 0x5B: 1, 0x5E: 2, 0x60: 3, 0x70: 1, 0x72: 2, 0x73: 1, 0x7A: 2, 0x85: 2, 0x86: 1, 0x87: 1, 0x8E: 2, 0x98: 1])
-    log.debug("encapsulatedCommand: ${encapsulatedCommand}")
+    // log.debug("encapsulatedCommand: ${encapsulatedCommand}")
 	state.sec = 1
 	if (encapsulatedCommand) {
 		zwaveEvent(encapsulatedCommand)
@@ -251,8 +273,7 @@ def pressedButton4() {
    pressedButton (4)
 }
 def zwaveEvent(physicalgraph.zwave.commands.centralscenev1.CentralSceneNotification cmd) {
-    log.debug("cmd: ${cmd}")
-    sendEvent(name: "LastSceneSequenceNumber" , value: "${cmd.sequenceNumber}")
+    // log.debug("cmd: ${cmd}")
     def result = []
     switch (cmd.keyAttributes) {
        case 0:
@@ -364,32 +385,60 @@ def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelEndPointR
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.multichannelv3.MultiChannelCmdEncap  cmd) {
-	// log.debug("$cmd")
+	log.debug("$cmd")
 	def ep = cmd.sourceEndPoint
 	def map = [:]
-	if (cmd.commandClass == 0x87 && cmd.command == 3) {
-		switch(ep) {
-			case 1:
-				map << [ name: "LED1State" ]
+	switch(cmd.commandClass) {
+		case 0x87:
+			if (cmd.command == 3) {
+				switch(ep) {
+					case 1:
+					map << [ name: "LED1State" ]
+					break
+					case 2:
+					map << [ name: "LED2State" ]
+					break
+					case 3:
+					map << [ name: "LED3State" ]
+					break
+					case 4:
+					map << [ name: "LED4State" ]
+					break
+				}
+				if (cmd.parameter[0] == 0) {
+					map.value = "off"
+				} else  {
+					map.value = "on"
+				}
+			}
 			break
-			case 2:
-				map << [ name: "LED2State" ]
-			break
-			case 3:
-				map << [ name: "LED3State" ]
-			break
-			case 4:
-				map << [ name: "LED4State" ]
-			break
-		}
-		if (cmd.parameter[0] == 0) {
-			map.value = "off"
-		} else  {
-			map.value = "on"
-		}
-		// log.debug("map: $map")
-		return map
+		case 0x20:
+			if (cmd.command == 3) {
+				switch(ep) {
+					case 1:
+					map << [ name: "switch1State" ]
+					break
+					case 2:
+					map << [ name: "switch2State" ]
+					break
+					case 3:
+					map << [ name: "switch3State" ]
+					break
+					case 4:
+					map << [ name: "switch4State" ]
+					break
+				}
+				if (cmd.parameter[0] == 0) {
+					map.value = "off"
+				} else  {
+					map.value = "on"
+				}
+			}
+		break
 	}
+	log.debug("map: $map")
+	sendEvent(map)
+	return map
 }
 
 
@@ -402,6 +451,50 @@ def on() {
 
 def off() {
 	commands([zwave.basicV1.basicSet(value: 0x00), zwave.basicV1.basicGet()], 1000)
+}
+
+def setLevel(value) {
+	commands([zwave.basicV1.basicSet(value: value as Integer), zwave.basicV1.basicGet()], 4000)
+}
+
+def switch1on() {
+	switchXstate("on", 1)
+}
+def switch1off() {
+	switchXstate("off", 1)
+}
+def switch2on() {
+	switchXstate("on", 2)
+}
+def switch2off() {
+	switchXstate("off", 2)
+}
+def switch3on() {
+	switchXstate("on", 3)
+}
+def switch3off() {
+	switchXstate("off", 3)
+}
+def switch4on() {
+	switchXstate("on", 4)
+}
+def switch4off() {
+	switchXstate("off", 4)
+}
+def switchXstate(action, switchnum) {
+	def cmds = []
+	if (action == "on") {
+		def evName = "switch" + switchnum + "State"
+		sendEvent(name: "$evName", value:"on")
+		cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: switchnum, commandClass: 0x20, command: 1, parameter: [0xFF])
+		cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: switchnum, commandClass: 0x20, command: 2)
+	} else {
+		def evName = "switch" + switchnum + "State"
+		sendEvent(name: "$evName", value:"on")
+		cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: switchnum, commandClass: 0x20, command: 1, parameter: [0])
+		cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: switchnum, commandClass: 0x20, command: 2)
+	}
+	commands(cmds, 750)
 }
 
 // -------------------------------------------------------------------------------
@@ -482,13 +575,15 @@ def refresh() {
 def test() {
 	log.debug("test()")
 	def cmds = []
-	def newSequenceNumber = device.currentValue("LastSceneSequenceNumber") + 1
 	// sendEvent(name: "LastSceneSequenceNumber" , value: "${newSequenceNumber}")
 
-	cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: 4, commandClass: 0x5B, command: 3, parameter: [107, 0x00, 4])
+	// commands([zwave.basicV1.basicSet(value: 0xFF), zwave.basicV1.basicGet()], 1000)
+	cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: 4, commandClass: 0x20, command: 1, parameter: [0])
+	cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: 4, commandClass: 0x20, command: 1, parameter: [0xFF])
+	// cmds << zwave.multiChannelV3.multiChannelCmdEncap(bitAddress: false, sourceEndPoint: 0, destinationEndPoint: 4, commandClass: 0x5B, command: 3, parameter: [107, 0x00, 4])
 	// cmds << physicalgraph.zwave.commands.centralscenev1.CentralSceneNotification(keyAttributes: 4, sceneNumber: 0, sequenceNumber: newSequenceNumber)
 	// cmds << zwave.centralSceneV1.centralSceneNotification(keyAttributes: 4, sceneNumber: 0, sequenceNumber: newSequenceNumber)
-	commands(cmds, 2000)
+	commands(cmds, 0)
 }
 
 // def toggleSecurity() {
